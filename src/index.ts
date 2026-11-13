@@ -6,6 +6,11 @@ const STATUS_KEY = "pi-ws-recovery";
 const CODEX_API = "openai-codex-responses";
 const ARGUMENTS = ["status", "retry"];
 
+function isMagpieHttp(ctx: ExtensionContext): boolean {
+  return ctx.model?.provider === "magpie" &&
+    ["openai-responses", "openai-completions"].includes(ctx.model.api);
+}
+
 export default function wsRecovery(pi: ExtensionAPI): void {
   const states = new Map<string, FallbackState>();
   let codex: CodexModule | undefined;
@@ -26,6 +31,12 @@ export default function wsRecovery(pi: ExtensionAPI): void {
     return state;
   }
   function showStatus(ctx: ExtensionContext): void {
+    if (isMagpieHttp(ctx)) {
+      const icon = ctx.ui.theme.fg("success", "⇄");
+      const label = ctx.ui.theme.fg("accent", "SSE · Magpie");
+      ctx.ui.setStatus(STATUS_KEY, `${icon} ${label}`);
+      return;
+    }
     if (ctx.model?.api !== CODEX_API || pi.getSettings().transport === "sse") {
       ctx.ui.setStatus(STATUS_KEY, undefined);
       return;
@@ -44,6 +55,15 @@ export default function wsRecovery(pi: ExtensionAPI): void {
     },
     handler: async (args, ctx) => {
       const argument = args.trim().toLowerCase();
+      if (!["", ...ARGUMENTS].includes(argument)) {
+        ctx.ui.notify("用法：/ws [status|retry]", "error");
+        return;
+      }
+      if (isMagpieHttp(ctx)) {
+        showStatus(ctx);
+        ctx.ui.notify("Pi → Magpie：HTTP/SSE\nMagpie → 上游：连接与重试由 Magpie 管理，当前插件无法读取上游传输状态。", "info");
+        return;
+      }
       const state = states.get(sessionId(ctx)) ?? await adopt(sessionId(ctx));
       if (argument === "retry") {
         if (!state) {
@@ -54,10 +74,6 @@ export default function wsRecovery(pi: ExtensionAPI): void {
         recoverable = true;
         showStatus(ctx);
         ctx.ui.notify("下一次请求将重试 WebSocket", "info");
-        return;
-      }
-      if (!["", "status"].includes(argument)) {
-        ctx.ui.notify("用法：/ws [status|retry]", "error");
         return;
       }
       ctx.ui.notify(describe(state, Date.now(), recoverable), "info");

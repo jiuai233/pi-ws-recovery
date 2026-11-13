@@ -11,7 +11,9 @@ Pi 的 Codex provider 在 WebSocket 失败后会改走 SSE，并且在当前进�
 - **接管已回退的会话**：加载或 `/reload` 时，读取 provider 里已处于 SSE 回退的会话，下一次请求即重试 WebSocket。
 - **超大请求单独处理**：`1009 message too big` 后，请求体比失败时缩小至少 20% 才重试。
 
-只作用于 `openai-codex-responses` 模型，不改写请求内容，不修改 Pi 的安装文件。
+自动恢复作用于 `openai-codex-responses` 模型，不改写请求内容，不修改 Pi 的安装文件。
+
+Magpie 的 `openai-responses` 和 `openai-completions` 模型显示 `⇄ SSE · Magpie`，表示 Pi 到网关的 HTTP/SSE 连接。`/ws` 显示连接说明；上游连接和重试由 Magpie 管理，`/ws retry` 不触发 Pi 的 Codex 重连。Magpie 到上游的传输状态不由该标签表示。Magpie 的传输行为见 [网关说明](https://github.com/yetone/magpie/blob/v0.1.1792/docs/subsystems/gateway-routing.md)。
 
 ## 安装
 

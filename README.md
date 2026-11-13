@@ -11,7 +11,9 @@ After a WebSocket failure, Pi's Codex provider switches to SSE and stays on SSE 
 - **Takes over sessions already on SSE**: on load or `/reload`, sessions the provider already holds in SSE fallback retry WebSocket on their next request.
 - **Handles oversized requests**: after `1009 message too big`, WebSocket is retried only once the request body is at least 20% smaller than the one that failed.
 
-It acts only on `openai-codex-responses` models, never rewrites requests, and does not modify Pi's installed files.
+Automatic recovery acts on `openai-codex-responses` models, never rewrites requests, and does not modify Pi's installed files.
+
+Magpie models using `openai-responses` or `openai-completions` show `⇄ SSE · Magpie` for the HTTP/SSE connection from Pi to the gateway. `/ws` explains the connection; Magpie manages upstream connections and retries, so `/ws retry` does not reset Pi’s Codex transport. The badge does not report Magpie’s upstream transport. See Magpie’s [gateway documentation](https://github.com/yetone/magpie/blob/v0.1.1792/docs/subsystems/gateway-routing.md).
 
 ## Install
 

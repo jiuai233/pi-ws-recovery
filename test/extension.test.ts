@@ -191,3 +191,46 @@ test("the badge is hidden when transport is forced to SSE", withFakePi(async () 
   await pi.emit("session_start", {});
   assert.equal(pi.status(), undefined);
 }));
+
+test("Magpie HTTP routes show SSE without probing Pi's Codex transport", withFakePi(async ({ fake }) => {
+  const bundle = fake("bundle");
+  bundle.stats.set("s1", { websocketFallbackActive: true });
+  for (const api of ["openai-responses", "openai-completions"]) {
+    for (const transport of ["auto", "sse", "websocket"]) {
+      const pi = harness({ provider: "magpie", id: "codex/gpt-6.1-sol", api }, transport);
+      await pi.emit("session_start", {});
+      assert.equal(pi.status(), "<success>⇄</success> <accent>SSE · Magpie</accent>");
+      await pi.emit("before_provider_request", { payload: { model: "codex/gpt-6.1-sol" } });
+      await pi.command("status");
+      assert.match(pi.lastMessage()!, /Pi → Magpie：HTTP\/SSE/);
+      assert.match(pi.lastMessage()!, /无法读取上游传输状态/);
+      await pi.command("retry");
+      assert.match(pi.lastMessage()!, /连接与重试由 Magpie 管理/);
+      await pi.command("unknown");
+      assert.equal(pi.lastMessage(), "用法：/ws [status|retry]");
+      await pi.emit("session_shutdown", {});
+      assert.equal(pi.status(), undefined);
+    }
+  }
+  assert.deepEqual(bundle.resets, []);
+}));
+
+test("switching to Magpie keeps the direct Codex fallback separate", withFakePi(async ({ fake }) => {
+  const pi = harness();
+  const bundle = fake("bundle");
+  bundle.stats.set("s1", {});
+  pi.emit("message_end", { message: failure(1000) });
+  assert.equal(pi.status(), fallback);
+  Object.assign(pi.ctx, { model: { provider: "magpie", id: "codex/gpt-6.1-sol", api: "openai-responses" } });
+  pi.emit("model_select", {});
+  assert.match(pi.status()!, /SSE · Magpie/);
+  await pi.command("status");
+  assert.match(pi.lastMessage()!, /Pi → Magpie/);
+  await pi.command("retry");
+  assert.deepEqual(bundle.resets, []);
+  Object.assign(pi.ctx, { model: codexModel });
+  pi.emit("model_select", {});
+  assert.equal(pi.status(), fallback);
+  await pi.command("status");
+  assert.match(pi.lastMessage()!, /30 秒后重试 WebSocket/);
+}));
